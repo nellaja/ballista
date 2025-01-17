@@ -1,0 +1,8 @@
+avahi-daemon
+bluetooth
+cups
+firewalld
+networkmanager
+smartd
+systemd-resolved
+systemd-timesyncd
