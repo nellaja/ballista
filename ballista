@@ -1,0 +1,284 @@
+#!/usr/bin/env bash
+
+# shellcheck disable=SC1090,SC2153,SC2034,SC2155,SC2181
+# SC1090: Can't follow non-constant source. Use a directive to specify location.
+# SC2034: foo appears unused. Verify it or export it.
+# SC2155: Declare and assign separately to avoid masking return values.
+# SC2153: Possible Misspelling: MYVARIABLE may not be assigned. Did you mean MY_VARIABLE?
+# SC2181: Check exit code directly with e.g. if mycmd;, not indirectly with $?.
+
+set -eu
+
+# Cleaning the TTY.
+clear
+
+### Variable names that can be changed.
+# Log file name.
+FILE=ballista.log
+# Config file.
+CONF_FILE=ballista.conf
+# AUR Helper
+AUR_COMMAND="paru"
+
+# Cosmetics (colours for text).
+BOLD='\e[1m'
+BRED='\e[91m'
+BBLUE='\e[34m'  
+BGREEN='\e[92m'
+BYELLOW='\e[93m'
+RESET='\e[0m'
+
+# Pretty print (function).
+info_print () {
+    echo -e "${BOLD}${BGREEN}[ ${BYELLOW}•${BGREEN} ] $1${RESET}"
+}
+
+# Pretty print for input (function).
+input_print () {
+    echo -ne "${BOLD}${BYELLOW}[ ${BGREEN}•${BYELLOW} ] $1${RESET}"
+}
+
+# Alert user of bad input (function).
+error_print () {
+    echo -e "${BOLD}${BRED}[ ${BBLUE}•${BRED} ] $1${RESET}"
+}
+
+# Exit the script if there is no internet connection (function).
+not_connected() {
+    sleep 1
+    error_print "No network connection!!!  Exiting now."
+    sleep 1
+    error_print "Your entire life has been a mathematical error."
+    sleep 1
+    exit 1
+}
+
+# Check for working internet connection (function).
+check_connection() {
+    info_print "Checking for network connection."
+    ping -c 3 archlinux.org &>/dev/null || not_connected
+    info_print "Connection good!"
+    sleep 1
+    info_print "Well done, android."
+    sleep 2
+}
+
+# Check for whether config option has been passed as an argument (function).
+init () {
+    while getopts "c" arg; do
+        case $arg in
+            c)
+                CONFIG_CONFIRM="true"
+                source "$CONF_FILE"
+                ;;
+            *)  CONFIG_CONFIRM="false"
+                ;;
+        esac
+    done
+    
+}
+
+# Checks system facts and sets variables (function).
+facts_commons() {
+    if [ -d /sys/firmware/efi ]; then
+        BIOS_TYPE="uefi"
+        BOOTLOADER="systemd"
+    else
+        error_print "This script does not support BIOS_TYPE=bios. Quitting."
+        exit 1
+    fi
+
+    if lscpu | grep -q "GenuineIntel"; then
+        CPU_VENDOR="intel"
+        INITRD_MICROCODE="intel-ucode.img"
+    elif lscpu | grep -q "AuthenticAMD"; then
+        CPU_VENDOR="amd"
+        INITRD_MICROCODE="amd-ucode.img"     
+    else
+        CPU_VENDOR=""
+        INITRD_MICROCODE=""
+    fi
+
+    if lspci -nn | grep "\[03" | grep -qi "intel"; then
+        GPU_VENDOR="intel"
+        DISPLAY_DRIVER="intel"
+    elif lspci -nn | grep "\[03" | grep -qi "amd"; then
+        GPU_VENDOR="amd"
+        DISPLAY_DRIVER="amdgpu"
+    elif lspci -nn | grep "\[03" | grep -qi "nvidia"; then
+        GPU_VENDOR="nvidia"
+        DISPLAY_DRIVER="nvidia"
+    else
+        GPU_VENDOR=""
+        DISPLAY_DRIVER=""
+    fi
+   
+    USER_NAME_INSTALL="$(whoami)"
+    if [ "$USER_NAME_INSTALL" == "root" ]; then
+        SYSTEM_INSTALLATION="true"
+    else
+        SYSTEM_INSTALLATION="false"
+    fi
+}
+
+# User chooses the console keyboard layout (function).
+keyboard_selector () {
+    input_print "Please insert the keyboard layout to use in console (enter empty to use US, or \"/\" to look up for keyboard layouts): "
+    read -r KBLAYOUT
+    case "$KBLAYOUT" in
+        '') KBLAYOUT="us"
+            info_print "The standard US keyboard layout will be used."
+            return 0;;
+        '/') localectl list-keymaps
+             clear
+             return 1;;
+        *) if ! localectl list-keymaps | grep -Fxq "$KBLAYOUT"; then
+               error_print "The specified keymap doesn't exist."
+               return 1
+           fi
+           info_print "The $KBLAYOUT will be used."
+           return 0;;
+    esac
+}
+
+# User chooses the terminal font (function).
+font_selector () {
+    
+    FONT="ter-124b"
+    info_print "Setting the default font to $FONT."
+    setfont "$FONT"
+    sleep 1
+
+    info_print "If $FONT is too big or too small, select a new size (sorted smallest to biggest); select DONE when finished."
+    select FONT_SEL in ter-118b ter-120b ter-122b ter-124b ter-128b ter-132b DONE ;
+    do
+        case $FONT_SEL in
+            DONE)
+                info_print "$FONT has been selected and set"
+                sleep 2
+                break
+                ;;
+            *)
+                FONT="$FONT_SEL"
+                info_print "Setting the font to $FONT."
+                setfont "$FONT"
+                sleep 1
+                info_print "Select different font size or select DONE to complete selection of $FONT."
+                ;;
+        esac
+    done
+}
+
+# User chooses disk for installation (function).
+disk_selector () {
+    
+    # Input block device on which Arch will be installed
+    info_print "The recognized block devices are as follows: "
+    sleep 1
+    lsblk -d
+    sleep 1
+    
+    PS3="Please select the number of the corresponding disk (e.g. 1): "
+    select ENTRY in $(lsblk -dpnoNAME|grep -P "/dev/sd|nvme|vd");
+    do
+        DISK="$ENTRY"
+        info_print "Arch Linux will be installed on the following disk: $DISK"
+        break
+    done
+}
+
+# Selecting a kernel to install (function).
+kernel_selector () {
+    info_print "List of kernels:"
+    info_print "1) Stable: Vanilla Linux kernel with a few specific Arch Linux patches applied"
+    info_print "2) Hardened: A security-focused Linux kernel"
+    info_print "3) Longterm: Long-term support (LTS) Linux kernel"
+    info_print "4) Zen Kernel: A Linux kernel optimized for desktop usage"
+    input_print "Please select the number of the corresponding kernel (e.g. 1): " 
+    read -r kernel_choice
+    case $kernel_choice in
+        1 ) KERNEL="linux"
+            return 0;;
+        2 ) KERNEL="linux-hardened"
+            return 0;;
+        3 ) KERNEL="linux-lts"
+            return 0;;
+        4 ) KERNEL="linux-zen"
+            return 0;;
+        * ) error_print "You did not enter a valid selection, please try again."
+            return 1
+    esac
+}
+
+# User chooses the locale (function).
+locale_selector () {
+    input_print "Please insert the locale you use (format: xx_XX. Enter empty to use en_US, or \"/\" to search locales): "
+    read -r LOCALE
+    case "$LOCALE" in
+        '') LOCALE="en_US.UTF-8"
+            info_print "$LOCALE will be the default locale."
+            return 0;;
+        '/') sed -E '/^# +|^#$/d;s/^#| *$//g;s/ .*/ (Charset:&)/' /etc/locale.gen | less -M
+                clear
+                return 1;;
+        *)  if ! grep -q "^#\?$(sed 's/[].*[]/\\&/g' <<< "$LOCALE") " /etc/locale.gen; then
+                error_print "The specified locale doesn't exist or isn't supported."
+                return 1
+            fi
+            return 0
+    esac
+}
+
+# Welcome screen.
+cat << "EOF"
+====================================================================================
+.______        ___       __       __       __       _______.___________.    ___      
+|   _  \      /   \     |  |     |  |     |  |     /       |           |   /   \     
+|  |_)  |    /  ^  \    |  |     |  |     |  |    |   (----`---|  |----`  /  ^  \    
+|   _  <    /  /_\  \   |  |     |  |     |  |     \   \       |  |      /  /_\  \   
+|  |_)  |  /  _____  \  |  `----.|  `----.|  | .----)   |      |  |     /  _____  \  
+|______/  /__/     \__\ |_______||_______||__| |_______/       |__|    /__/     \__\ 
+
+====================================================================================
+EOF
+
+info_print "Welcome to BALLISTA, a Bash-driven Arch Linux Lightning Installation Script for Tailored Automation."
+echo ""
+
+# Check for working internet connection; will exit script if there is no connection.
+check_connection 
+
+# Check whether config file option has been chosen.
+init "$@"
+
+# Start logging.
+START_TIMESTAMP=$(date +"%F %T")
+#set -o xtrace
+exec &> >(tee -a "$FILE")
+
+# Retrieve basic system facts.
+facts_commons
+
+# Use guided prompts to complete option selection if config file option not used.
+if ! CONFIG_CONFIRM; then
+
+    # Setting up keyboard layout.
+    until keyboard_selector; do : ; done
+
+    # Setting up terminal font.
+    font_selector
+
+    # Choosing the target disk for the installation.
+    disk_selector
+
+    # Setting up the kernel.
+    until kernel_selector; do : ; done
+
+    # User choses the locale.
+    until locale_selector; do : ; done
+fi 
+
+# Perform install.
+loadkeys "$KBLAYOUT"
+setfont "$FONT"
+timedatectl set-ntp true
