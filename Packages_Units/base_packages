@@ -1,9 +1,11 @@
+alsa-firmware
 bash-completion
 bat
 bluez
 bluez-utils
 btop
 chafa
+cpupower
 cups
 cups-pdf
 dosfstools
@@ -22,6 +24,7 @@ go
 gst-plugin-pipewire
 imagemagick
 inetutils
+inxi
 jq
 less
 libnotify
@@ -45,6 +48,7 @@ pipewire-pulse
 pkgfile
 pkgstats
 plocate
+power-profiles-daemon
 pv
 python
 python-packaging
@@ -52,6 +56,7 @@ qt5-wayland
 qt6-base
 qt6-svg
 qt6-wayland
+realtime-privileges
 reflector
 ripgrep
 rsync
@@ -63,6 +68,7 @@ shfmt
 smartmontools
 snapper
 snap-pac
+sof-firmware
 system-config-printer
 tealdeer
 unrar

@@ -1,0 +1,13 @@
+avahi-daemon.service
+bluetooth.service
+firewalld.service
+NetworkManager.service
+smartd.service
+systemd-resolved.service
+systemd-timesyncd.service
+cups.socket
+fstrim.timer
+logrotate.timer
+man-db.timer
+paccache.timer
+pkgfile-update.timer

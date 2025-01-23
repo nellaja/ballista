@@ -1,7 +1,11 @@
+intel-compute-runtime
 intel-media-driver
+intel-oneapi-compiler-shared-runtime
 libva-intel-driver
 lib32-libva-intel-driver
 lib32-mesa
+lib32-opencl-rusticl-mesa
 lib32-vulkan-intel
 mesa
+opencl-rusticl-mesa 
 vulkan-intel
