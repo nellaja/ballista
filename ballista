@@ -1,24 +1,12 @@
 #!/usr/bin/env bash
 
-# shellcheck disable=SC1090,SC2153,SC2034,SC2155,SC2181
-# SC1090: Can't follow non-constant source. Use a directive to specify location.
-# SC2034: foo appears unused. Verify it or export it.
-# SC2155: Declare and assign separately to avoid masking return values.
-# SC2153: Possible Misspelling: MYVARIABLE may not be assigned. Did you mean MY_VARIABLE?
-# SC2181: Check exit code directly with e.g. if mycmd;, not indirectly with $?.
-
 set -eu
 
 # Cleaning the TTY.
 clear
 
-### Variable names that can be changed.
-# Log file name.
-FILE=ballista.log
-# Config file.
-CONF_FILE=ballista.conf
-# AUR Helper
-AUR_COMMAND="paru"
+# Global variables
+CONFIG_FILE="ballista.conf"
 
 # Cosmetics (colours for text).
 BOLD='\e[1m'
@@ -43,194 +31,142 @@ error_print () {
     echo -e "${BOLD}${BRED}[ ${BBLUE}•${BRED} ] $1${RESET}"
 }
 
-# Exit the script if there is no internet connection (function).
+# Exit the script if there is no internet connection (function)
 not_connected() {
     sleep 1
-    error_print "No network connection!!!  Exiting now."
+    error_print "No network connection! Exiting now."
     sleep 1
     error_print "Your entire life has been a mathematical error."
-    sleep 1
+    sleep 2
     exit 1
 }
 
-# Check for working internet connection (function).
-check_connection() {
-    info_print "Checking for network connection."
+# Check for working internet connection (function)
+check_connection() {    
+    info_print "Trying to ping archlinux.org."
     ping -c 3 archlinux.org &>/dev/null || not_connected
+
     info_print "Connection good!"
     sleep 1
     info_print "Well done, android."
     sleep 2
 }
 
-# Check for whether config option has been passed as an argument (function).
-init () {
-    while getopts "c" arg; do
-        case $arg in
-            c)
-                CONFIG_CONFIRM="true"
-                source "$CONF_FILE"
-                ;;
-            *)  CONFIG_CONFIRM="false"
-                ;;
-        esac
-    done
-    
-}
+# Check validity of user-set variables and autoset certain system variables (function)
+init () {  
 
-# Checks system facts and sets variables (function).
-facts_commons() {
-    if [ -d /sys/firmware/efi ]; then
-        BIOS_TYPE="uefi"
-        BOOTLOADER="systemd"
-    else
-        error_print "This script does not support BIOS_TYPE=bios. Quitting."
+    # Confirm valid keymap value provided in config file
+    if [[ ! localectl list-keymaps | grep -Fxq "$KEYS" ]]; then
+        error_print "The specified keymap, $KEYS, does not exist."
+        sleep 1
+        error_print "This is your fault. It didn't have to be like this."
+        sleep 2
         exit 1
     fi
 
-    if lscpu | grep -q "GenuineIntel"; then
-        CPU_VENDOR="intel"
-        INITRD_MICROCODE="intel-ucode.img"
-    elif lscpu | grep -q "AuthenticAMD"; then
-        CPU_VENDOR="amd"
-        INITRD_MICROCODE="amd-ucode.img"     
-    else
-        CPU_VENDOR=""
-        INITRD_MICROCODE=""
+    # Confirm valid font name provided in config file
+    if [[ ! ls -a /usr/share/kbd/consolefonts | grep -Fq "$FONT" ]]; then
+        error_print "The specified font, $FONT, does not exist."
+        sleep 1
+        error_print "I don't hate you."
+        sleep 2
+        exit 1
     fi
 
-    if lspci -nn | grep "\[03" | grep -qi "intel"; then
-        GPU_VENDOR="intel"
-        DISPLAY_DRIVER="intel"
-    elif lspci -nn | grep "\[03" | grep -qi "amd"; then
+    # Confirm valid device path provided in config file
+    if [[ ! lsblk -dpnoNAME | grep -Fxq "$DISK" ]]; then
+        error_print "The specified disk, $DISK, does not exist."
+        sleep 1
+        error_print "Get ready to fling yourself. Fling into space."
+        sleep 2
+        exit 1
+    fi
+
+    # Define the partition numbers for boot and root partitions based on the provided device name
+    if [[ "${DISK::4}" == "nvme" ]]; then
+        BOOT_PART="${DISK}p1"
+        ROOT_PART="${DISK}p2"
+    else
+        BOOT_PART="${DISK}1"
+        ROOT_PART="${DISK}2"
+    fi
+
+    # Confirm valid kernel name provided in config file
+    case $KERNEL in
+        "linux" )
+            ;;
+        "linux-hardened" )
+            ;;
+        "linux-lts" )
+            ;;
+        "linux-zen" )
+            ;;
+        * ) 
+            error_print "$KERNEL is not a valid kernel selection."
+            sleep 1
+            error_print "Nice job breaking it. Hero."
+            sleep 2
+            exit 1
+    esac
+
+    # Determine the CPU manufacturer and assign corresponding microcode values
+    CPU=$(lscpu | grep "Vendor ID:")
+
+    if [[ "$CPU" == *"AuthenticAMD"* ]]; then
+        MICROCODE="amd-ucode"
+    else
+        MICROCODE="intel-ucode"
+    fi
+
+    # Confirm that valid timezone provided in config file
+    if [[ ! -f "/usr/share/zoneinfo/$TIMEZONE" ]]; then
+        error_print "$TIMEZONE is not a valid timezone selection."
+        sleep 1
+        error_print "There really was a cake..."
+        sleep 2
+        exit 1
+    fi
+
+    # Confirm that valid locale provided in config file
+    if [[ ! cat /etc/locale.gen | grep -Fq "$LOCALE" ]]; then
+        error_print "The specified locale doesn't exist or isn't supported."
+        sleep 1
+        error_print "Killing you and giving you good advice aren't mutually exclusive. The rocket really is the way to go."
+        sleep 2
+        exit 1
+    fi
+
+    # Confirm that non-empty hostname was provided in config file
+    if [[ -z "$HOSTNAME" ]]; then
+        error_print "You need to enter a hostname in order to continue."
+        sleep 1
+        error_print "Is anyone there?"
+        sleep 2
+        exit 1
+    fi
+
+    # Determine the GPU manufacturer
+    if [[ lspci -nn | grep "\[03" | grep -qi "intel" ]]; then
+        GPU_VENDOR="intel"     
+    elif [[ lspci -nn | grep "\[03" | grep -qi "amd" ]]; then
         GPU_VENDOR="amd"
-        DISPLAY_DRIVER="amdgpu"
-    elif lspci -nn | grep "\[03" | grep -qi "nvidia"; then
-        GPU_VENDOR="nvidia"
-        DISPLAY_DRIVER="nvidia"
     else
         GPU_VENDOR=""
-        DISPLAY_DRIVER=""
     fi
-   
-    USER_NAME_INSTALL="$(whoami)"
-    if [ "$USER_NAME_INSTALL" == "root" ]; then
-        SYSTEM_INSTALLATION="true"
-    else
-        SYSTEM_INSTALLATION="false"
+
+    # Confirm that non-empty user name was provided in config file
+    if [[ -z "$USER_NAME" ]]; then
+        error_print "You need to enter a user name in order to continue."
+        sleep 1
+        error_print "You're still shuffling around a little, but believe me you're dead."
+        sleep 2
+        exit 1
     fi
-}
-
-# User chooses the console keyboard layout (function).
-keyboard_selector () {
-    input_print "Please insert the keyboard layout to use in console (enter empty to use US, or \"/\" to look up for keyboard layouts): "
-    read -r KBLAYOUT
-    case "$KBLAYOUT" in
-        '') KBLAYOUT="us"
-            info_print "The standard US keyboard layout will be used."
-            return 0;;
-        '/') localectl list-keymaps
-             clear
-             return 1;;
-        *) if ! localectl list-keymaps | grep -Fxq "$KBLAYOUT"; then
-               error_print "The specified keymap doesn't exist."
-               return 1
-           fi
-           info_print "The $KBLAYOUT will be used."
-           return 0;;
-    esac
-}
-
-# User chooses the terminal font (function).
-font_selector () {
     
-    FONT="ter-124b"
-    info_print "Setting the default font to $FONT."
-    setfont "$FONT"
-    sleep 1
-
-    info_print "If $FONT is too big or too small, select a new size (sorted smallest to biggest); select DONE when finished."
-    select FONT_SEL in ter-118b ter-120b ter-122b ter-124b ter-128b ter-132b DONE ;
-    do
-        case $FONT_SEL in
-            DONE)
-                info_print "$FONT has been selected and set"
-                sleep 2
-                break
-                ;;
-            *)
-                FONT="$FONT_SEL"
-                info_print "Setting the font to $FONT."
-                setfont "$FONT"
-                sleep 1
-                info_print "Select different font size or select DONE to complete selection of $FONT."
-                ;;
-        esac
-    done
 }
 
-# User chooses disk for installation (function).
-disk_selector () {
-    
-    # Input block device on which Arch will be installed
-    info_print "The recognized block devices are as follows: "
-    sleep 1
-    lsblk -d
-    sleep 1
-    
-    PS3="Please select the number of the corresponding disk (e.g. 1): "
-    select ENTRY in $(lsblk -dpnoNAME|grep -P "/dev/sd|nvme|vd");
-    do
-        DISK="$ENTRY"
-        info_print "Arch Linux will be installed on the following disk: $DISK"
-        break
-    done
-}
-
-# Selecting a kernel to install (function).
-kernel_selector () {
-    info_print "List of kernels:"
-    info_print "1) Stable: Vanilla Linux kernel with a few specific Arch Linux patches applied"
-    info_print "2) Hardened: A security-focused Linux kernel"
-    info_print "3) Longterm: Long-term support (LTS) Linux kernel"
-    info_print "4) Zen Kernel: A Linux kernel optimized for desktop usage"
-    input_print "Please select the number of the corresponding kernel (e.g. 1): " 
-    read -r kernel_choice
-    case $kernel_choice in
-        1 ) KERNEL="linux"
-            return 0;;
-        2 ) KERNEL="linux-hardened"
-            return 0;;
-        3 ) KERNEL="linux-lts"
-            return 0;;
-        4 ) KERNEL="linux-zen"
-            return 0;;
-        * ) error_print "You did not enter a valid selection, please try again."
-            return 1
-    esac
-}
-
-# User chooses the locale (function).
-locale_selector () {
-    input_print "Please insert the locale you use (format: xx_XX. Enter empty to use en_US, or \"/\" to search locales): "
-    read -r LOCALE
-    case "$LOCALE" in
-        '') LOCALE="en_US.UTF-8"
-            info_print "$LOCALE will be the default locale."
-            return 0;;
-        '/') sed -E '/^# +|^#$/d;s/^#| *$//g;s/ .*/ (Charset:&)/' /etc/locale.gen | less -M
-                clear
-                return 1;;
-        *)  if ! grep -q "^#\?$(sed 's/[].*[]/\\&/g' <<< "$LOCALE") " /etc/locale.gen; then
-                error_print "The specified locale doesn't exist or isn't supported."
-                return 1
-            fi
-            return 0
-    esac
-}
-
-# Welcome screen.
-cat << "EOF"
+# Welcome screen
+cat <<"EOF"
 ====================================================================================
 .______        ___       __       __       __       _______.___________.    ___      
 |   _  \      /   \     |  |     |  |     |  |     /       |           |   /   \     
@@ -238,47 +174,242 @@ cat << "EOF"
 |   _  <    /  /_\  \   |  |     |  |     |  |     \   \       |  |      /  /_\  \   
 |  |_)  |  /  _____  \  |  `----.|  `----.|  | .----)   |      |  |     /  _____  \  
 |______/  /__/     \__\ |_______||_______||__| |_______/       |__|    /__/     \__\ 
-
+                                                                                     
 ====================================================================================
 EOF
-
 info_print "Welcome to BALLISTA, a Bash-driven Arch Linux Lightning Installation Script for Tailored Automation."
 echo ""
 
-# Check for working internet connection; will exit script if there is no connection.
-check_connection 
+# Check if there is working network connection; exit script if no network connection
+check_connection
 
-# Check whether config file option has been chosen.
-init "$@"
-
-# Start logging.
+# Record start time of script
 START_TIMESTAMP=$(date +"%F %T")
-#set -o xtrace
-exec &> >(tee -a "$FILE")
 
-# Retrieve basic system facts.
-facts_commons
+# Perform script initialization 
+source "$CONFIG_FILE"
+init
 
-# Use guided prompts to complete option selection if config file option not used.
-if ! CONFIG_CONFIRM; then
+# Set keyboard layout
+loadkeys "$KEYS"
 
-    # Setting up keyboard layout.
-    until keyboard_selector; do : ; done
-
-    # Setting up terminal font.
-    font_selector
-
-    # Choosing the target disk for the installation.
-    disk_selector
-
-    # Setting up the kernel.
-    until kernel_selector; do : ; done
-
-    # User choses the locale.
-    until locale_selector; do : ; done
-fi 
-
-# Perform install.
-loadkeys "$KBLAYOUT"
+# Set tty font
 setfont "$FONT"
+
+# Enable NTP to synchronize time within the live environment
 timedatectl set-ntp true
+
+# Partition the target disk of the installation
+wipefs -af "$DISK" &>/dev/null
+sgdisk -Zo "$DISK" &>/dev/null
+sgdisk -o "$DISK"
+sgdisk -n 0:0:+1G -t 0:ef00 "$DISK"
+sgdisk -n 0:0:0 -t 0:8304 "$DISK"
+partprobe "$DISK"
+
+# Create the filesystem for the EFI partition
+mkfs.fat -F 32 "$BOOT_PART" &>/dev/null
+
+# Create the filesystem for the Root partition
+mkfs.btrfs "$ROOT_PART" &>/dev/null
+
+# Create btrfs subvolumes
+mount "$ROOT_PART" /mnt
+btrfs subvolume create /mnt/@ &>/dev/null
+btrfs subvolume create /mnt/@home &>/dev/null
+btrfs subvolume create /mnt/@cache &>/dev/null
+btrfs subvolume create /mnt/@log &>/dev/null
+umount /mnt
+
+# Mount btrfs subvolumes
+mount -o subvol=/@,noatime,compress=zstd "$ROOT_PART" /mnt
+mount -o subvol=/@home,noatime,compress=zstd -m "$ROOT_PART" /mnt/home
+mount -o subvol=/@cache,noatime,compress=zstd -m "$ROOT_PART" /mnt/var/cache
+mount -o subvol=/@log,noatime,compress=zstd -m "$ROOT_PART" /mnt/var/log
+
+# Mount the efi partition on /boot
+mount -o fmask=0077,dmask=0077 -m "$BOOT_PART" /mnt/boot
+
+# Update mirror list
+reflector --verbose --protocol https --country US,UK,Canada,France,Germany --latest 19 --score 11 --sort rate --save /etc/pacman.d/mirrorlist
+
+# Install base system
+pacstrap -K /mnt base base-devel linux-firmware btrfs-progs "$KERNEL" "$MICROCODE" &>/dev/null
+
+# Generate the system's fstab
+genfstab -U /mnt >> /mnt/etc/fstab
+
+# Set up the region/timezone
+arch-chroot /mnt ln -sf /usr/share/zoneinfo/"$TIMEZONE" /etc/localtime &>/dev/null
+
+# Synchronize the hardware clock
+arch-chroot /mnt hwclock --systohc
+
+# Generate and configure the locale information
+sed -i "/^#$LOCALE/s/^#//" /mnt/etc/locale.gen
+arch-chroot /mnt locale-gen &>/dev/null
+echo "LANG=${LOCALE}" > /mnt/etc/locale.conf
+
+# Configure the virtual console
+echo "KEYMAP=${KEYS}" > /mnt/etc/vconsole.conf
+echo "FONT=${FONT}" >> /mnt/etc/vconsole.conf
+
+# Create the hostname file and put the hostname in it
+echo "$HOSTNAME" > /mnt/etc/hostname
+
+# Edit the hosts file
+cat > /mnt/etc/hosts <<EOF
+127.0.0.1   localhost
+::1         localhost
+127.0.1.1   ${HOSTNAME}.localdomain   $HOSTNAME
+EOF
+
+# Configure pacman
+cp pacman.conf /mnt/etc/pacman.conf
+
+# Execute full system update to bring in multilib repository
+arch-chroot /mnt pacman -Syyu
+
+# Install system fonts
+arch-chroot /mnt pacman -S --noconfirm - < ./Packages_Units/fonts_packages
+if [[ "$?" != "0" ]]; then
+    error_print "Error encountered while installing fonts. Exiting."
+    sleep 1
+    error_print "Where did your life go so wrong?"
+    sleep 2
+    exit 1
+fi
+
+# Install additional system packages
+arch-chroot /mnt pacman -S --noconfirm - < ./Packages_Units/base_packages
+if [[ "$?" != "0" ]]; then
+    error_print "Error encountered while installing base packages. Exiting."
+    sleep 1
+    error_print "Ewww, what's wrong with your legs?"
+    sleep 2
+    exit 1
+fi
+
+# Install graphics drivers
+if [[ $GPU_VENDOR == "intel" ]]; then
+    arch-chroot /mnt pacman -S --noconfirm - < ./Packages_Units/intel_gpu_packages
+    if [[ "$?" != "0" ]]; then
+        error_print "Error encountered while installing Intel GPU packages. Exiting."
+        sleep 1
+        error_print "I'm going to kill you and all the cake is gone."
+        sleep 2
+        exit 1
+    fi
+elif [[ $GPU_VENDOR == "amd" ]]; then
+    arch-chroot /mnt pacman -S --noconfirm - < ./Packages_Units/amd_gpu_packages
+    if [[ "$?" != "0" ]]; then
+        error_print "Error encountered while installing AMD GPU packages. Exiting."
+        sleep 1
+        error_print "Shutting down."
+        sleep 2
+        exit 1
+    fi
+else
+    info_print "Your GPU vendor is not supported by this script."
+    sleep 1
+    info_print "Please, manually install necessary GPU drivers after installation is complete."
+    sleep 2
+fi
+
+# Install other packages
+arch-chroot /mnt pacman -S --noconfirm - < ./Packages_Units/other_packages
+if [[ "$?" != "0" ]]; then
+    error_print "Error encountered while installing other packages. Exiting."
+    sleep 1
+    error_print "Goodnight."
+    sleep 2
+    exit 1
+fi
+
+# Install sway packages
+arch-chroot /mnt pacman -S --noconfirm - < ./Packages_Units/sway_packages
+if [[ "$?" != "0" ]]; then
+    error_print "Error encountered while installing sway packages. Exiting."
+    sleep 1
+    error_print "Are you still there?"
+    sleep 2
+    exit 1
+fi
+
+# Set root password
+echo "root:admin" | arch-chroot /mnt chpasswd
+
+# Create user
+arch-chroot /mnt useradd -m -G wheel "$USER_NAME"
+echo "$USER_NAME:user" | arch-chroot /mnt chpasswd
+
+# Copy my system config files to the install
+    ## GPU config files
+if [[ $GPU_VENDOR == "intel" ]]; then
+    cp ./Config_Files/intel_opencl.sh /mnt/etc/profile.d/opencl.conf
+    cp ./Config_Files/intel_30-opencl.conf /mnt/etc/environment.d/30-opencl.conf
+elif [[ $GPU_VENDOR == "amd" ]]; then
+    cp ./Config_Files/amd_opencl.sh /mnt/etc/profile.d/opencl.conf
+    cp ./Config_Files/amd_30-opencl.conf /mnt/etc/environment.d/30-opencl.conf
+fi
+    ## Standard config files for all systems
+cp ./Config_Files/mkinitcpio.conf /mnt/etc/mkinitcpio.conf
+cp ./Config_Files/dns.conf /mnt/etc/NetworkManager/conf.d/dns.conf
+cp ./Config_Files/nsswitch.conf /mnt/etc/nsswitch.conf
+cp ./Config_Files/system-login /mnt/etc/pam.d/system-login
+cp ./Config_Files/mdns-disable.conf /mnt/etc/systemd/resolved.conf.d/mdns-disable.conf
+cp ./Config_Files/zram-generator.conf /mnt/etc/systemd/zram-generator.conf
+    ## Config files from CachyOS
+cp ./Config_Files/blacklist.conf /mnt/etc/modprobe.d/blacklist.conf
+cp ./Config_Files/99-cachyos-settings.conf /mnt/etc/sysctl.d/99-cachyos-settings.conf
+cp ./Config_Files/00-journal-size.conf /mnt/etc/systemd/journald.conf.d/00-journal-size.conf
+cp ./Config_Files/delegate.conf /mnt/etc/systemd/system/user@.service.d/delegate.conf
+cp ./Config_Files/00-timeout.conf /mnt/etc/systemd/system.conf.d/00-timeout.conf
+cp ./Config_Files/limits.conf /mnt/etc/systemd/system.conf.d/limits.conf
+cp ./Config_Files/timesyncd.conf /mnt/etc/systemd/timesyncd.conf.d/timesyncd.conf
+cp ./Config_Files/limits-user.conf /mnt/etc/systemd/user.conf.d/limits.conf
+cp ./Config_Files/thp-shrinker.conf /mnt/etc/tmpfiles.d/thp-shrinker.conf
+cp ./Config_Files/thp.conf /mnt/etc/tmpfiles.d/thp.conf
+cp ./Config_Files/50-sata.rules /mnt/etc/udev/rules.d/50-sata.rules
+cp ./Config_Files/60-ioschedulers.rules /mnt/etc/udev/rules.d/60-ioschedulers.rules
+cp ./Config_Files/reboot-required.hook /mnt/usr/share/libalpm/hooks/reboot-required.hook
+
+# Enable systemd units
+mapfile -t UNITS < ./Packages_Units/systemd_units
+arch-chroot /mnt systemctl daemon-reload
+arch-chroot /mnt systemctl start /dev/zram0
+arch-chroot /mnt systemctl enable "${UNITS[@]}"
+arch-chroot /mnt systemctl --user -M "$USER_NAME"@ enable pipewire.socket pipewire-pulse.socket wireplumber
+
+# Configure the bootloader
+arch-chroot /mnt systemd-machine-id-setup
+arch-chroot /mnt bootctl install
+MACHINE_ID=$( cat /etc/machine-id )
+
+cat > /mnt/boot/loader/loader.conf <<EOF
+default  ${MACHINE_ID}*
+timeout  3
+console-mode keep
+EOF
+
+cat > /mnt/boot/loader/entries/${MACHINE_ID}.conf <<EOF
+title Arch Linux
+linux /vmlinuz-${KERNEL}
+initrd /initramfs-${KERNEL}.img
+options rootflags=subvol=/@ zswap.enabled=0 nowatchdog rw quiet
+EOF
+
+# Rebuild mkinitcpio
+arch-chroot /mnt mkinitcpio -P
+
+# End of installation
+END_TIMESTAMP=$(date +"%F %T")
+INSTALLATION_TIME=$(date -d @$(($(date -d "$END_TIMESTAMP" '+%s') - $(date -d "$START_TIMESTAMP" '+%s'))) '+%T')
+info_print "Installation start $START_TIMESTAMP and end $END_TIMESTAMP; total installation time $INSTALLATION_TIME"
+sleep 2
+info_print "Sucess!! Arch Linux is installed. The system will automatically shutdown now."
+sleep 3
+
+# Unmount and shutdown
+umount -R /mnt
+shutdown now
