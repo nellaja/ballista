@@ -388,7 +388,7 @@ MACHINE_ID=$( cat /etc/machine-id )
 
 cat > /mnt/boot/loader/loader.conf <<EOF
 default  ${MACHINE_ID}*
-timeout  3
+timeout  5
 console-mode keep
 EOF
 
