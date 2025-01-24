@@ -2,5 +2,5 @@ mesa
 lib32-mesa
 vulkan-radeon
 lib32-vulkan-radeon
-opencl-rusticl-mesa 
+opencl-rusticl-mesa
 lib32-opencl-rusticl-mesa
