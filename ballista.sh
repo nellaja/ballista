@@ -217,7 +217,7 @@ partprobe "${DISK}"
 mkfs.fat -F 32 "${BOOT_PART}" &>/dev/null
 
 # Create the filesystem for the Root partition
-mkfs.btrfs "${ROOT_PART}" &>/dev/null
+mkfs.btrfs -f "${ROOT_PART}" &>/dev/null
 
 # Create btrfs subvolumes
 mount "${ROOT_PART}" /mnt
@@ -237,10 +237,10 @@ mount -o subvol=/@log,noatime,compress=zstd -m "${ROOT_PART}" /mnt/var/log
 mount -o fmask=0077,dmask=0077 -m "${BOOT_PART}" /mnt/boot
 
 # Update mirror list
-reflector --verbose --protocol https --country US,UK,Canada,France,Germany --latest 19 --score 11 --sort rate --save /etc/pacman.d/mirrorlist
+reflector --verbose --protocol https --country US,UK,Canada,France --latest 19 --score 11 --sort rate --save /etc/pacman.d/mirrorlist
 
 # Install base system
-pacstrap -K /mnt base base-devel linux-firmware btrfs-progs "${KERNEL}" "${MICROCODE}" &>/dev/null
+pacstrap -K /mnt base base-devel linux-firmware btrfs-progs "${KERNEL}" "${MICROCODE}"
 
 # Generate the system's fstab
 genfstab -U /mnt >> /mnt/etc/fstab
@@ -271,7 +271,7 @@ cat > /mnt/etc/hosts <<EOF
 EOF
 
 # Configure pacman
-cp pacman.conf /mnt/etc/pacman.conf
+cp ./Config_Files/pacman.conf /mnt/etc/pacman.conf
 
 # Execute full system update to bring in multilib repository
 arch-chroot /mnt pacman -Syyu
