@@ -4,7 +4,7 @@ set -eu
 
 GITHUB_USER="nellaja"
 BRANCH="main"
-ARTIFACT="ballista"
+ARTIFACT="ballista-${BRANCH}"
 
 set -o xtrace
 
