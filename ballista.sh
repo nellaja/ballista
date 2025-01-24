@@ -276,40 +276,24 @@ cp ./Config_Files/pacman.conf /mnt/etc/pacman.conf
 # Execute full system update to bring in multilib repository
 arch-chroot /mnt pacman -Syyu
 
-# Install system fonts
-arch-chroot /mnt pacman -S --noconfirm - < ./Packages_Units/fonts_packages
-if [[ "$?" != "0" ]]; then
-    error_print "Error encountered while installing fonts. Exiting."
-    sleep 1
-    error_print "Where did your life go so wrong?"
-    sleep 2
-    exit 1
-fi
-
-# Install additional system packages
-arch-chroot /mnt pacman -S --noconfirm - < ./Packages_Units/base_packages
-if [[ "$?" != "0" ]]; then
-    error_print "Error encountered while installing base packages. Exiting."
-    sleep 1
-    error_print "Ewww, what's wrong with your legs?"
-    sleep 2
-    exit 1
-fi
-
-# Install graphics drivers
+# Install additional packages
 if [[ "${GPU_VENDOR}" == "intel" ]]; then
-    arch-chroot /mnt pacman -S --noconfirm - < ./Packages_Units/intel_gpu_packages
+    cd /Packages_Units
+    cat fonts_packages base_packages intel_gpu_packages other_packages sway_packages >> all_packages
+    arch-chroot /mnt pacman -S --noconfirm - < all_packages
     if [[ "$?" != "0" ]]; then
-        error_print "Error encountered while installing Intel GPU packages. Exiting."
+        error_print "Error encountered while installing packages. Exiting."
         sleep 1
-        error_print "I'm going to kill you and all the cake is gone."
+        error_print "Ewww, what's wrong with your legs?"
         sleep 2
         exit 1
     fi
 elif [[ "${GPU_VENDOR}" == "amd" ]]; then
-    arch-chroot /mnt pacman -S --noconfirm - < ./Packages_Units/amd_gpu_packages
+    cd /Packages_Units
+    cat fonts_packages base_packages amd_gpu_packages other_packages sway_packages >> all_packages
+    arch-chroot /mnt pacman -S --noconfirm - < all_packages
     if [[ "$?" != "0" ]]; then
-        error_print "Error encountered while installing AMD GPU packages. Exiting."
+        error_print "Error encountered while installing packages. Exiting."
         sleep 1
         error_print "Shutting down."
         sleep 2
@@ -317,29 +301,18 @@ elif [[ "${GPU_VENDOR}" == "amd" ]]; then
     fi
 else
     info_print "Your GPU vendor is not supported by this script."
-    sleep 1
     info_print "Please, manually install necessary GPU drivers after installation is complete."
     sleep 2
-fi
-
-# Install other packages
-arch-chroot /mnt pacman -S --noconfirm - < ./Packages_Units/other_packages
-if [[ "$?" != "0" ]]; then
-    error_print "Error encountered while installing other packages. Exiting."
-    sleep 1
-    error_print "Goodnight."
-    sleep 2
-    exit 1
-fi
-
-# Install sway packages
-arch-chroot /mnt pacman -S --noconfirm - < ./Packages_Units/sway_packages
-if [[ "$?" != "0" ]]; then
-    error_print "Error encountered while installing sway packages. Exiting."
-    sleep 1
-    error_print "Are you still there?"
-    sleep 2
-    exit 1
+    cd /Packages_Units
+    cat fonts_packages base_packages other_packages sway_packages >> all_packages
+    arch-chroot /mnt pacman -S --noconfirm - < all_packages
+    if [[ "$?" != "0" ]]; then
+        error_print "Error encountered while installing packages. Exiting."
+        sleep 1
+        error_print "Shutting down."
+        sleep 2
+        exit 1
+    fi
 fi
 
 # Set root password
