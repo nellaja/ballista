@@ -56,7 +56,7 @@ check_connection() {
 init () {  
 
     # Confirm valid keymap value provided in config file
-    valid_count=$(localectl list-keymaps | grep -Fxc "${KEYS}")
+    valid_count=$(localectl list-keymaps | grep -Fxc "${KEYS}") || true
     if [[ "${valid_count}" -eq 0 ]]; then
         error_print "The specified keymap, ${KEYS}, does not exist."
         sleep 1
@@ -66,7 +66,7 @@ init () {
     fi
 
     # Confirm valid font name provided in config file
-    valid_count=$(ls -a /usr/share/kbd/consolefonts | grep -Fc "${FONT}")
+    valid_count=$(ls -a /usr/share/kbd/consolefonts | grep -Fc "${FONT}") || true
     if [[ "${valid_count}" -eq 0 ]]; then
         error_print "The specified font, ${FONT}, does not exist."
         sleep 1
@@ -76,7 +76,7 @@ init () {
     fi
 
     # Confirm valid device path provided in config file
-    valid_count=$(lsblk -dpnoNAME | grep -Fc "${DISK}")
+    valid_count=$(lsblk -dpnoNAME | grep -Fc "${DISK}") || true
     if [[ "${valid_count}" -eq 0 ]]; then
         error_print "The specified disk, ${DISK}, does not exist."
         sleep 1
@@ -113,7 +113,7 @@ init () {
     esac
 
     # Determine the CPU manufacturer and assign corresponding microcode values
-    CPU=$(lscpu | grep "Vendor ID:")
+    CPU=$(lscpu | grep "Vendor ID:") || true
 
     if [[ "${CPU}" == *"AuthenticAMD"* ]]; then
         MICROCODE="amd-ucode"
@@ -131,7 +131,7 @@ init () {
     fi
 
     # Confirm that valid locale provided in config file
-    valid_count=$(cat /etc/locale.gen | grep -Fc "${LOCALE}")
+    valid_count=$(cat /etc/locale.gen | grep -Fc "${LOCALE}") || true
     if [[ "${valid_count}" -eq 0 ]]; then
         error_print "The specified locale doesn't exist or isn't supported."
         sleep 1
@@ -150,8 +150,8 @@ init () {
     fi
 
     # Determine the GPU manufacturer
-    count_intel=$(lspci -nn | grep "\[03" | grep -ic "intel")
-    count_amd=$(lspci -nn | grep "\[03" | grep -ic "amd")
+    count_intel=$(lspci -nn | grep "\[03" | grep -ic "intel") || true
+    count_amd=$(lspci -nn | grep "\[03" | grep -ic "amd") || true
     if [[ "${count_intel}" -gt 0 ]]; then
         GPU_VENDOR="intel"     
     elif [[ "${count_amd}" -gt 0 ]]; then
