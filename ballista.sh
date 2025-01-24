@@ -315,6 +315,8 @@ else
     fi
 fi
 
+cd ..
+
 # Set root password
 echo "root:admin" | arch-chroot /mnt chpasswd
 
