@@ -10,7 +10,6 @@ set -o xtrace
 
 curl -sL -o "${ARTIFACT}.zip" "https://github.com/${GITHUB_USER}/ballista/archive/refs/heads/${BRANCH}.zip"
 bsdtar -x -f "${ARTIFACT}.zip"
-cp -R "${ARTIFACT}" "${ARTIFACT}"/*.conf "${ARTIFACT}"/Config_Files/ "${ARTIFACT}"/Packages_Units/ ./
+cp -R "${ARTIFACT}"/ballista "${ARTIFACT}"/*.conf "${ARTIFACT}"/Config_Files/ "${ARTIFACT}"/Packages_Units/ ./
 
-chmod +x configs/*.sh
-chmod +x ./*.sh
+chmod +x ./ballista
