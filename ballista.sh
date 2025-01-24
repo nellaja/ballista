@@ -278,7 +278,7 @@ arch-chroot /mnt pacman -Syyu
 
 # Install additional packages
 if [[ "${GPU_VENDOR}" == "intel" ]]; then
-    cd /Packages_Units
+    cd Packages_Units
     cat fonts_packages base_packages intel_gpu_packages other_packages sway_packages >> all_packages
     arch-chroot /mnt pacman -S --noconfirm - < all_packages
     if [[ "$?" != "0" ]]; then
@@ -289,7 +289,7 @@ if [[ "${GPU_VENDOR}" == "intel" ]]; then
         exit 1
     fi
 elif [[ "${GPU_VENDOR}" == "amd" ]]; then
-    cd /Packages_Units
+    cd Packages_Units
     cat fonts_packages base_packages amd_gpu_packages other_packages sway_packages >> all_packages
     arch-chroot /mnt pacman -S --noconfirm - < all_packages
     if [[ "$?" != "0" ]]; then
@@ -303,7 +303,7 @@ else
     info_print "Your GPU vendor is not supported by this script."
     info_print "Please, manually install necessary GPU drivers after installation is complete."
     sleep 2
-    cd /Packages_Units
+    cd Packages_Units
     cat fonts_packages base_packages other_packages sway_packages >> all_packages
     arch-chroot /mnt pacman -S --noconfirm - < all_packages
     if [[ "$?" != "0" ]]; then
