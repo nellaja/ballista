@@ -56,9 +56,9 @@ check_connection() {
 init () {  
 
     # Confirm valid keymap value provided in config file
-    valid_count=$(localectl list-keymaps | grep -Fxc "$KEYS")
-    if [[ $valid_count -eq 0 ]]; then
-        error_print "The specified keymap, $KEYS, does not exist."
+    valid_count=$(localectl list-keymaps | grep -Fxc "${KEYS}")
+    if [[ "${valid_count}" -eq 0 ]]; then
+        error_print "The specified keymap, ${KEYS}, does not exist."
         sleep 1
         error_print "This is your fault. It didn't have to be like this."
         sleep 2
@@ -66,9 +66,9 @@ init () {
     fi
 
     # Confirm valid font name provided in config file
-    valid_count=$(ls -a /usr/share/kbd/consolefonts | grep -Fc "$FONT")
-    if [[ $valid_count -eq 0 ]]; then
-        error_print "The specified font, $FONT, does not exist."
+    valid_count=$(ls -a /usr/share/kbd/consolefonts | grep -Fc "${FONT}")
+    if [[ "${valid_count}" -eq 0 ]]; then
+        error_print "The specified font, ${FONT}, does not exist."
         sleep 1
         error_print "I don't hate you."
         sleep 2
@@ -76,9 +76,9 @@ init () {
     fi
 
     # Confirm valid device path provided in config file
-    valid_count=$(lsblk -dpnoNAME | grep -Fxc "$DISK")
-    if [[ $valid_count -eq 0 ]]; then
-        error_print "The specified disk, $DISK, does not exist."
+    valid_count=$(lsblk -dpnoNAME | grep -Fc "${DISK}")
+    if [[ "${valid_count}" -eq 0 ]]; then
+        error_print "The specified disk, ${DISK}, does not exist."
         sleep 1
         error_print "Get ready to fling yourself. Fling into space."
         sleep 2
@@ -86,7 +86,7 @@ init () {
     fi
 
     # Define the partition numbers for boot and root partitions based on the provided device name
-    if [[ "${DISK::4}" == "nvme" ]]; then
+    if [[ "${DISK::9}" == "/dev/nvme" ]]; then
         BOOT_PART="${DISK}p1"
         ROOT_PART="${DISK}p2"
     else
@@ -95,7 +95,7 @@ init () {
     fi
 
     # Confirm valid kernel name provided in config file
-    case $KERNEL in
+    case "${KERNEL}" in
         "linux" )
             ;;
         "linux-hardened" )
@@ -105,7 +105,7 @@ init () {
         "linux-zen" )
             ;;
         * ) 
-            error_print "$KERNEL is not a valid kernel selection."
+            error_print "${KERNEL} is not a valid kernel selection."
             sleep 1
             error_print "Nice job breaking it. Hero."
             sleep 2
@@ -115,15 +115,15 @@ init () {
     # Determine the CPU manufacturer and assign corresponding microcode values
     CPU=$(lscpu | grep "Vendor ID:")
 
-    if [[ "$CPU" == *"AuthenticAMD"* ]]; then
+    if [[ "${CPU}" == *"AuthenticAMD"* ]]; then
         MICROCODE="amd-ucode"
     else
         MICROCODE="intel-ucode"
     fi
 
     # Confirm that valid timezone provided in config file
-    if [[ ! -f "/usr/share/zoneinfo/$TIMEZONE" ]]; then
-        error_print "$TIMEZONE is not a valid timezone selection."
+    if [[ ! -f "/usr/share/zoneinfo/${TIMEZONE}" ]]; then
+        error_print "${TIMEZONE} is not a valid timezone selection."
         sleep 1
         error_print "There really was a cake..."
         sleep 2
@@ -131,8 +131,8 @@ init () {
     fi
 
     # Confirm that valid locale provided in config file
-    valid_count=$(cat /etc/locale.gen | grep -Fc "$LOCALE")
-    if [[ $valid_count -eq 0 ]]; then
+    valid_count=$(cat /etc/locale.gen | grep -Fc "${LOCALE}")
+    if [[ "${valid_count}" -eq 0 ]]; then
         error_print "The specified locale doesn't exist or isn't supported."
         sleep 1
         error_print "Killing you and giving you good advice aren't mutually exclusive. The rocket really is the way to go."
@@ -141,7 +141,7 @@ init () {
     fi
 
     # Confirm that non-empty hostname was provided in config file
-    if [[ -z "$HOSTNAME" ]]; then
+    if [[ -z "${HOSTNAME}" ]]; then
         error_print "You need to enter a hostname in order to continue."
         sleep 1
         error_print "Is anyone there?"
@@ -152,16 +152,16 @@ init () {
     # Determine the GPU manufacturer
     count_intel=$(lspci -nn | grep "\[03" | grep -ic "intel")
     count_amd=$(lspci -nn | grep "\[03" | grep -ic "amd")
-    if [[ $count_intel -gt 0 ]]; then
+    if [[ "${count_intel}" -gt 0 ]]; then
         GPU_VENDOR="intel"     
-    elif [[ $count_amd -gt 0 ]]; then
+    elif [[ "${count_amd}" -gt 0 ]]; then
         GPU_VENDOR="amd"
     else
         GPU_VENDOR=""
     fi
 
     # Confirm that non-empty user name was provided in config file
-    if [[ -z "$USER_NAME" ]]; then
+    if [[ -z "${USER_NAME}" ]]; then
         error_print "You need to enter a user name in order to continue."
         sleep 1
         error_print "You're still shuffling around a little, but believe me you're dead."
@@ -193,34 +193,34 @@ check_connection
 START_TIMESTAMP=$(date +"%F %T")
 
 # Perform script initialization 
-source "$CONFIG_FILE"
+source "${CONFIG_FILE}"
 init
 
 # Set keyboard layout
-loadkeys "$KEYS"
+loadkeys "${KEYS}"
 
 # Set tty font
-setfont "$FONT"
+setfont "${FONT}"
 
 # Enable NTP to synchronize time within the live environment
 timedatectl set-ntp true
 
 # Partition the target disk of the installation
-wipefs -af "$DISK" &>/dev/null
-sgdisk -Zo "$DISK" &>/dev/null
-sgdisk -o "$DISK"
-sgdisk -n 0:0:+1G -t 0:ef00 "$DISK"
-sgdisk -n 0:0:0 -t 0:8304 "$DISK"
-partprobe "$DISK"
+wipefs -af "${DISK}" &>/dev/null
+sgdisk -Zo "${DISK}" &>/dev/null
+sgdisk -o "${DISK}"
+sgdisk -n 0:0:+1G -t 0:ef00 "${DISK}"
+sgdisk -n 0:0:0 -t 0:8304 "${DISK}"
+partprobe "${DISK}"
 
 # Create the filesystem for the EFI partition
-mkfs.fat -F 32 "$BOOT_PART" &>/dev/null
+mkfs.fat -F 32 "${BOOT_PART}" &>/dev/null
 
 # Create the filesystem for the Root partition
-mkfs.btrfs "$ROOT_PART" &>/dev/null
+mkfs.btrfs "${ROOT_PART}" &>/dev/null
 
 # Create btrfs subvolumes
-mount "$ROOT_PART" /mnt
+mount "${ROOT_PART}" /mnt
 btrfs subvolume create /mnt/@ &>/dev/null
 btrfs subvolume create /mnt/@home &>/dev/null
 btrfs subvolume create /mnt/@cache &>/dev/null
@@ -228,31 +228,31 @@ btrfs subvolume create /mnt/@log &>/dev/null
 umount /mnt
 
 # Mount btrfs subvolumes
-mount -o subvol=/@,noatime,compress=zstd "$ROOT_PART" /mnt
-mount -o subvol=/@home,noatime,compress=zstd -m "$ROOT_PART" /mnt/home
-mount -o subvol=/@cache,noatime,compress=zstd -m "$ROOT_PART" /mnt/var/cache
-mount -o subvol=/@log,noatime,compress=zstd -m "$ROOT_PART" /mnt/var/log
+mount -o subvol=/@,noatime,compress=zstd "${ROOT_PART}" /mnt
+mount -o subvol=/@home,noatime,compress=zstd -m "${ROOT_PART}" /mnt/home
+mount -o subvol=/@cache,noatime,compress=zstd -m "${ROOT_PART}" /mnt/var/cache
+mount -o subvol=/@log,noatime,compress=zstd -m "${ROOT_PART}" /mnt/var/log
 
 # Mount the efi partition on /boot
-mount -o fmask=0077,dmask=0077 -m "$BOOT_PART" /mnt/boot
+mount -o fmask=0077,dmask=0077 -m "${BOOT_PART}" /mnt/boot
 
 # Update mirror list
 reflector --verbose --protocol https --country US,UK,Canada,France,Germany --latest 19 --score 11 --sort rate --save /etc/pacman.d/mirrorlist
 
 # Install base system
-pacstrap -K /mnt base base-devel linux-firmware btrfs-progs "$KERNEL" "$MICROCODE" &>/dev/null
+pacstrap -K /mnt base base-devel linux-firmware btrfs-progs "${KERNEL}" "${MICROCODE}" &>/dev/null
 
 # Generate the system's fstab
 genfstab -U /mnt >> /mnt/etc/fstab
 
 # Set up the region/timezone
-arch-chroot /mnt ln -sf /usr/share/zoneinfo/"$TIMEZONE" /etc/localtime &>/dev/null
+arch-chroot /mnt ln -sf /usr/share/zoneinfo/"${TIMEZONE}" /etc/localtime &>/dev/null
 
 # Synchronize the hardware clock
 arch-chroot /mnt hwclock --systohc
 
 # Generate and configure the locale information
-sed -i "/^#$LOCALE/s/^#//" /mnt/etc/locale.gen
+sed -i "/^#${LOCALE}/s/^#//" /mnt/etc/locale.gen
 arch-chroot /mnt locale-gen &>/dev/null
 echo "LANG=${LOCALE}" > /mnt/etc/locale.conf
 
@@ -261,13 +261,13 @@ echo "KEYMAP=${KEYS}" > /mnt/etc/vconsole.conf
 echo "FONT=${FONT}" >> /mnt/etc/vconsole.conf
 
 # Create the hostname file and put the hostname in it
-echo "$HOSTNAME" > /mnt/etc/hostname
+echo "${HOSTNAME}" > /mnt/etc/hostname
 
 # Edit the hosts file
 cat > /mnt/etc/hosts <<EOF
 127.0.0.1   localhost
 ::1         localhost
-127.0.1.1   ${HOSTNAME}.localdomain   $HOSTNAME
+127.0.1.1   ${HOSTNAME}.localdomain   ${HOSTNAME}
 EOF
 
 # Configure pacman
@@ -297,7 +297,7 @@ if [[ "$?" != "0" ]]; then
 fi
 
 # Install graphics drivers
-if [[ $GPU_VENDOR == "intel" ]]; then
+if [[ "${GPU_VENDOR}" == "intel" ]]; then
     arch-chroot /mnt pacman -S --noconfirm - < ./Packages_Units/intel_gpu_packages
     if [[ "$?" != "0" ]]; then
         error_print "Error encountered while installing Intel GPU packages. Exiting."
@@ -306,7 +306,7 @@ if [[ $GPU_VENDOR == "intel" ]]; then
         sleep 2
         exit 1
     fi
-elif [[ $GPU_VENDOR == "amd" ]]; then
+elif [[ "${GPU_VENDOR}" == "amd" ]]; then
     arch-chroot /mnt pacman -S --noconfirm - < ./Packages_Units/amd_gpu_packages
     if [[ "$?" != "0" ]]; then
         error_print "Error encountered while installing AMD GPU packages. Exiting."
@@ -346,15 +346,15 @@ fi
 echo "root:admin" | arch-chroot /mnt chpasswd
 
 # Create user
-arch-chroot /mnt useradd -m -G wheel "$USER_NAME"
-echo "$USER_NAME:user" | arch-chroot /mnt chpasswd
+arch-chroot /mnt useradd -m -G wheel "${USER_NAME}"
+echo "${USER_NAME}:user" | arch-chroot /mnt chpasswd
 
 # Copy my system config files to the install
     ## GPU config files
-if [[ $GPU_VENDOR == "intel" ]]; then
+if [[ "${GPU_VENDOR}" == "intel" ]]; then
     cp ./Config_Files/intel_opencl.sh /mnt/etc/profile.d/opencl.conf
     cp ./Config_Files/intel_30-opencl.conf /mnt/etc/environment.d/30-opencl.conf
-elif [[ $GPU_VENDOR == "amd" ]]; then
+elif [[ "${GPU_VENDOR}" == "amd" ]]; then
     cp ./Config_Files/amd_opencl.sh /mnt/etc/profile.d/opencl.conf
     cp ./Config_Files/amd_30-opencl.conf /mnt/etc/environment.d/30-opencl.conf
 fi
@@ -385,7 +385,7 @@ mapfile -t UNITS < ./Packages_Units/systemd_units
 arch-chroot /mnt systemctl daemon-reload
 arch-chroot /mnt systemctl start /dev/zram0
 arch-chroot /mnt systemctl enable "${UNITS[@]}"
-arch-chroot /mnt systemctl --user -M "$USER_NAME"@ enable pipewire.socket pipewire-pulse.socket wireplumber
+arch-chroot /mnt systemctl --user -M "${USER_NAME}"@ enable pipewire.socket pipewire-pulse.socket wireplumber
 
 # Configure the bootloader
 arch-chroot /mnt systemd-machine-id-setup
@@ -410,8 +410,8 @@ arch-chroot /mnt mkinitcpio -P
 
 # End of installation
 END_TIMESTAMP=$(date +"%F %T")
-INSTALLATION_TIME=$(date -d @$(($(date -d "$END_TIMESTAMP" '+%s') - $(date -d "$START_TIMESTAMP" '+%s'))) '+%T')
-info_print "Installation start $START_TIMESTAMP and end $END_TIMESTAMP; total installation time $INSTALLATION_TIME"
+INSTALLATION_TIME=$(date -d @$(($(date -d "${END_TIMESTAMP}" '+%s') - $(date -d "${START_TIMESTAMP}" '+%s'))) '+%T')
+info_print "Installation start ${START_TIMESTAMP} and end ${END_TIMESTAMP}; total installation time ${INSTALLATION_TIME}"
 sleep 2
 info_print "Sucess!! Arch Linux is installed. The system will automatically shutdown now."
 sleep 3
