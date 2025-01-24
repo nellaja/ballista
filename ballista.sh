@@ -327,33 +327,32 @@ echo "${USER_NAME}:user" | arch-chroot /mnt chpasswd
 # Copy my system config files to the install
     ## GPU config files
 if [[ "${GPU_VENDOR}" == "intel" ]]; then
-    cp ./Config_Files/intel_opencl.sh /mnt/etc/profile.d/opencl.conf
-    cp ./Config_Files/intel_30-opencl.conf /mnt/etc/environment.d/30-opencl.conf
+    mkdir -p /mnt/etc/profile.d && cp ./Config_Files/intel_opencl.sh /mnt/etc/profile.d/opencl.conf
+    mkdir -p /mnt/etc/environment.d && cp ./Config_Files/intel_30-opencl.conf /mnt/etc/environment.d/30-opencl.conf
 elif [[ "${GPU_VENDOR}" == "amd" ]]; then
-    cp ./Config_Files/amd_opencl.sh /mnt/etc/profile.d/opencl.conf
-    cp ./Config_Files/amd_30-opencl.conf /mnt/etc/environment.d/30-opencl.conf
+    mkdir -p /mnt/etc/profile.d && cp ./Config_Files/amd_opencl.sh /mnt/etc/profile.d/opencl.conf
+    mkdir -p /mnt/etc/environment.d && cp ./Config_Files/amd_30-opencl.conf /mnt/etc/environment.d/30-opencl.conf
 fi
     ## Standard config files for all systems
 cp ./Config_Files/mkinitcpio.conf /mnt/etc/mkinitcpio.conf
-cp ./Config_Files/dns.conf /mnt/etc/NetworkManager/conf.d/dns.conf
+mkdir -p /mnt/etc/NetworkManager/conf.d && cp ./Config_Files/dns.conf /mnt/etc/NetworkManager/conf.d/dns.conf
 cp ./Config_Files/nsswitch.conf /mnt/etc/nsswitch.conf
-cp ./Config_Files/system-login /mnt/etc/pam.d/system-login
-cp ./Config_Files/mdns-disable.conf /mnt/etc/systemd/resolved.conf.d/mdns-disable.conf
+mkdir -p /mnt/etc/pam.d && cp ./Config_Files/system-login /mnt/etc/pam.d/system-login
+mkdir -p /mnt/etc/systemd/resolved.conf.d && cp ./Config_Files/mdns-disable.conf /mnt/etc/systemd/resolved.conf.d/mdns-disable.conf
 cp ./Config_Files/zram-generator.conf /mnt/etc/systemd/zram-generator.conf
     ## Config files from CachyOS
-cp ./Config_Files/blacklist.conf /mnt/etc/modprobe.d/blacklist.conf
-cp ./Config_Files/99-cachyos-settings.conf /mnt/etc/sysctl.d/99-cachyos-settings.conf
-cp ./Config_Files/00-journal-size.conf /mnt/etc/systemd/journald.conf.d/00-journal-size.conf
-cp ./Config_Files/delegate.conf /mnt/etc/systemd/system/user@.service.d/delegate.conf
-cp ./Config_Files/00-timeout.conf /mnt/etc/systemd/system.conf.d/00-timeout.conf
+mkdir -p /mnt/etc/modprobe.d && cp ./Config_Files/blacklist.conf /mnt/etc/modprobe.d/blacklist.conf
+mkdir -p /mnt/etc/sysctl.d && cp ./Config_Files/99-cachyos-settings.conf /mnt/etc/sysctl.d/99-cachyos-settings.conf
+mkdir -p /mnt/etc/systemd/journald.conf.d && cp ./Config_Files/00-journal-size.conf /mnt/etc/systemd/journald.conf.d/00-journal-size.conf
+mkdir -p /mnt/etc/systemd/system/user@.service.d && cp ./Config_Files/delegate.conf /mnt/etc/systemd/system/user@.service.d/delegate.conf
+mkdir -p /mnt/etc/systemd/system.conf.d && cp ./Config_Files/00-timeout.conf /mnt/etc/systemd/system.conf.d/00-timeout.conf
 cp ./Config_Files/limits.conf /mnt/etc/systemd/system.conf.d/limits.conf
-cp ./Config_Files/timesyncd.conf /mnt/etc/systemd/timesyncd.conf.d/timesyncd.conf
-cp ./Config_Files/limits-user.conf /mnt/etc/systemd/user.conf.d/limits.conf
-cp ./Config_Files/thp-shrinker.conf /mnt/etc/tmpfiles.d/thp-shrinker.conf
+mkdir -p /mnt/etc/systemd/timesyncd.conf.d && cp ./Config_Files/timesyncd.conf /mnt/etc/systemd/timesyncd.conf.d/timesyncd.conf
+mkdir -p /mnt/etc/systemd/user.conf.d && cp ./Config_Files/limits-user.conf /mnt/etc/systemd/user.conf.d/limits.conf
+mkdir -p /mnt/etc/tmpfiles.d && cp ./Config_Files/thp-shrinker.conf /mnt/etc/tmpfiles.d/thp-shrinker.conf
 cp ./Config_Files/thp.conf /mnt/etc/tmpfiles.d/thp.conf
-cp ./Config_Files/50-sata.rules /mnt/etc/udev/rules.d/50-sata.rules
+mkdir -p /mnt/etc/udev/rules.d && cp ./Config_Files/50-sata.rules /mnt/etc/udev/rules.d/50-sata.rules
 cp ./Config_Files/60-ioschedulers.rules /mnt/etc/udev/rules.d/60-ioschedulers.rules
-cp ./Config_Files/reboot-required.hook /mnt/usr/share/libalpm/hooks/reboot-required.hook
 
 # Enable systemd units
 mapfile -t UNITS < ./Packages_Units/systemd_units
