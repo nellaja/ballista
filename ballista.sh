@@ -150,9 +150,11 @@ init () {
     fi
 
     # Determine the GPU manufacturer
-    if [[ lspci -nn | grep "\[03" | grep -qi "intel" ]]; then
+    count_intel=$(lspci -nn | grep "\[03" | grep -ic "intel")
+    count_amd=$(lspci -nn | grep "\[03" | grep -ic "amd")
+    if [[ $count_intel -gt 0 ]]; then
         GPU_VENDOR="intel"     
-    elif [[ lspci -nn | grep "\[03" | grep -qi "amd" ]]; then
+    elif [[ $count_amd -gt 0 ]]; then
         GPU_VENDOR="amd"
     else
         GPU_VENDOR=""
