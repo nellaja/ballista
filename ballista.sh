@@ -56,7 +56,8 @@ check_connection() {
 init () {  
 
     # Confirm valid keymap value provided in config file
-    if [[ ! localectl list-keymaps | grep -Fxq "$KEYS" ]]; then
+    valid_count=$(localectl list-keymaps | grep -Fxc "$KEYS")
+    if [[ $valid_count -eq 0 ]]; then
         error_print "The specified keymap, $KEYS, does not exist."
         sleep 1
         error_print "This is your fault. It didn't have to be like this."
