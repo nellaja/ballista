@@ -76,7 +76,7 @@ init () {
     fi
 
     # Confirm valid device path provided in config file
-    valid_count=$(lsblk -dpnoNAME | grep -Fc "${DISK}") || true
+    valid_count=$(lsblk -dpnoNAME | grep -Fxc "${DISK}") || true
     if [[ "${valid_count}" -eq 0 ]]; then
         error_print "The specified disk, ${DISK}, does not exist."
         sleep 1
