@@ -66,7 +66,8 @@ init () {
     fi
 
     # Confirm valid font name provided in config file
-    if [[ ! ls -a /usr/share/kbd/consolefonts | grep -Fq "$FONT" ]]; then
+    valid_count=$(ls -a /usr/share/kbd/consolefonts | grep -Fc "$FONT")
+    if [[ $valid_count -eq 0 ]]; then
         error_print "The specified font, $FONT, does not exist."
         sleep 1
         error_print "I don't hate you."
@@ -75,7 +76,8 @@ init () {
     fi
 
     # Confirm valid device path provided in config file
-    if [[ ! lsblk -dpnoNAME | grep -Fxq "$DISK" ]]; then
+    valid_count=$(lsblk -dpnoNAME | grep -Fxc "$DISK")
+    if [[ $valid_count -eq 0 ]]; then
         error_print "The specified disk, $DISK, does not exist."
         sleep 1
         error_print "Get ready to fling yourself. Fling into space."
@@ -129,7 +131,8 @@ init () {
     fi
 
     # Confirm that valid locale provided in config file
-    if [[ ! cat /etc/locale.gen | grep -Fq "$LOCALE" ]]; then
+    valid_count=$(cat /etc/locale.gen | grep -Fc "$LOCALE")
+    if [[ $valid_count -eq 0 ]]; then
         error_print "The specified locale doesn't exist or isn't supported."
         sleep 1
         error_print "Killing you and giving you good advice aren't mutually exclusive. The rocket really is the way to go."
