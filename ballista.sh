@@ -381,7 +381,7 @@ arch-chroot /mnt systemctl --user -M "${USER_NAME}"@ enable pipewire.socket pipe
 info_print "Configuring systemd bootloader."
 arch-chroot /mnt systemd-machine-id-setup
 arch-chroot /mnt bootctl install
-MACHINE_ID=$( cat /etc/machine-id )
+MACHINE_ID=$( cat /mnt/etc/machine-id )
 
 cat > /mnt/boot/loader/loader.conf <<EOF
 default  ${MACHINE_ID}*
