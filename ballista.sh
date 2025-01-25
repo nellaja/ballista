@@ -206,6 +206,7 @@ setfont "${FONT}"
 timedatectl set-ntp true
 
 # Partition the target disk of the installation
+info_print "Partitioning the disk."
 wipefs -af "${DISK}" &>/dev/null
 sgdisk -Zo "${DISK}" &>/dev/null
 sgdisk -o "${DISK}"
@@ -213,6 +214,7 @@ sgdisk -n 0:0:+1G -t 0:ef00 "${DISK}"
 sgdisk -n 0:0:0 -t 0:8304 "${DISK}"
 partprobe "${DISK}"
 
+info_print "Formatting filesystems."
 # Create the filesystem for the EFI partition
 mkfs.fat -F 32 "${BOOT_PART}" &>/dev/null
 
@@ -220,6 +222,7 @@ mkfs.fat -F 32 "${BOOT_PART}" &>/dev/null
 mkfs.btrfs -f "${ROOT_PART}" &>/dev/null
 
 # Create btrfs subvolumes
+info_print "Creating btrfs subvolumes and mounting all partitions."
 mount "${ROOT_PART}" /mnt
 btrfs subvolume create /mnt/@ &>/dev/null
 btrfs subvolume create /mnt/@home &>/dev/null
@@ -237,30 +240,37 @@ mount -o subvol=/@log,noatime,compress=zstd -m "${ROOT_PART}" /mnt/var/log
 mount -o fmask=0077,dmask=0077 -m "${BOOT_PART}" /mnt/boot
 
 # Update mirror list
+info_print "Updating mirror list."
 reflector --verbose --protocol https --country US,UK,Canada,France --latest 19 --score 11 --sort rate --save /etc/pacman.d/mirrorlist
 
 # Install base system
+info_print "Installing base system."
 pacstrap -K /mnt base base-devel linux-firmware btrfs-progs "${KERNEL}" "${MICROCODE}"
 
 # Generate the system's fstab
+info_print "Generating fstab."
 genfstab -U /mnt >> /mnt/etc/fstab
 
 # Set up the region/timezone
+info_print "Setting timezone."
 arch-chroot /mnt ln -sf /usr/share/zoneinfo/"${TIMEZONE}" /etc/localtime &>/dev/null
 
 # Synchronize the hardware clock
 arch-chroot /mnt hwclock --systohc
 
 # Generate and configure the locale information
+info_print "Configuring locale."
 sed -i "/^#${LOCALE}/s/^#//" /mnt/etc/locale.gen
 arch-chroot /mnt locale-gen &>/dev/null
 echo "LANG=${LOCALE}" > /mnt/etc/locale.conf
 
 # Configure the virtual console
+info_print "Configuring virtual console."
 echo "KEYMAP=${KEYS}" > /mnt/etc/vconsole.conf
 echo "FONT=${FONT}" >> /mnt/etc/vconsole.conf
 
 # Create the hostname file and put the hostname in it
+info_print "Creating network config files."
 echo "${HOSTNAME}" > /mnt/etc/hostname
 
 # Edit the hosts file
@@ -271,12 +281,14 @@ cat > /mnt/etc/hosts <<EOF
 EOF
 
 # Configure pacman
+info_print "Configuring pacman"
 cp ./Config_Files/pacman.conf /mnt/etc/pacman.conf
 
 # Execute full system update to bring in multilib repository
 arch-chroot /mnt pacman -Syyu
 
 # Install additional packages
+info_print "Installing additional packages."
 if [[ "${GPU_VENDOR}" == "intel" ]]; then
     cd Packages_Units
     cat fonts_packages base_packages intel_gpu_packages other_packages sway_packages >> all_packages
@@ -318,13 +330,16 @@ fi
 cd ..
 
 # Set root password
+info_print "Setting root password."
 echo "root:admin" | arch-chroot /mnt chpasswd
 
 # Create user
+info_print "Creating user."
 arch-chroot /mnt useradd -m -G wheel "${USER_NAME}"
 echo "${USER_NAME}:user" | arch-chroot /mnt chpasswd
 
 # Copy my system config files to the install
+info_print "Installing configuration files."
     ## GPU config files
 if [[ "${GPU_VENDOR}" == "intel" ]]; then
     mkdir -p /mnt/etc/profile.d && cp ./Config_Files/intel_opencl.sh /mnt/etc/profile.d/opencl.conf
@@ -355,6 +370,7 @@ mkdir -p /mnt/etc/udev/rules.d && cp ./Config_Files/50-sata.rules /mnt/etc/udev/
 cp ./Config_Files/60-ioschedulers.rules /mnt/etc/udev/rules.d/60-ioschedulers.rules
 
 # Enable systemd units
+info_print "Enabling systemd units."
 mapfile -t UNITS < ./Packages_Units/systemd_units
 arch-chroot /mnt systemctl daemon-reload
 arch-chroot /mnt systemctl start /dev/zram0
@@ -362,6 +378,7 @@ arch-chroot /mnt systemctl enable "${UNITS[@]}"
 arch-chroot /mnt systemctl --user -M "${USER_NAME}"@ enable pipewire.socket pipewire-pulse.socket wireplumber
 
 # Configure the bootloader
+info_print "Configuring systemd bootloader."
 arch-chroot /mnt systemd-machine-id-setup
 arch-chroot /mnt bootctl install
 MACHINE_ID=$( cat /etc/machine-id )
@@ -380,6 +397,7 @@ options rootflags=subvol=/@ zswap.enabled=0 nowatchdog rw quiet
 EOF
 
 # Rebuild mkinitcpio
+info_print "Rebuilding initramfs files."
 arch-chroot /mnt mkinitcpio -P
 
 # End of installation
@@ -387,8 +405,10 @@ END_TIMESTAMP=$(date +"%F %T")
 INSTALLATION_TIME=$(date -d @$(($(date -d "${END_TIMESTAMP}" '+%s') - $(date -d "${START_TIMESTAMP}" '+%s'))) '+%T')
 info_print "Installation start ${START_TIMESTAMP} and end ${END_TIMESTAMP}; total installation time ${INSTALLATION_TIME}"
 sleep 2
-info_print "Sucess!! Arch Linux is installed. The system will automatically shutdown now."
-sleep 3
+info_print "Sucess!! Arch Linux is installed. The system will now shutdown so that you can reboot into your installed Arch Linux system."
+sleep 1
+read -n 1 -s -r -p "Press any key to continue shutdown..."
+echo  
 
 # Unmount and shutdown
 umount -R /mnt
