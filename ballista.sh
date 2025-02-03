@@ -245,7 +245,7 @@ reflector --verbose --protocol https --country US,UK,Canada,France --latest 19 -
 
 # Install base system
 info_print "Installing base system."
-pacstrap -K /mnt base base-devel linux-firmware btrfs-progs "${KERNEL}" "${MICROCODE}"
+pacstrap -K /mnt base base-devel linux-firmware btrfs-progs linux-lts "${KERNEL}" "${MICROCODE}"
 
 # Generate the system's fstab
 info_print "Generating fstab."
